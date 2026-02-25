@@ -1,24 +1,8 @@
-const mongoose = require("mongoose");
-require("dotenv").config();
-const MONGODB_URI = process.env.MONGODB_URI;
+const { createClient } = require("@supabase/supabase-js");
 
-mongoose.connect(MONGODB_URI, {
-	useNewUrlParser: true,
-	useUnifiedTopology: true,
-});
+const supabase = createClient(
+	process.env.SUPABASE_URL,
+	process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
-const db = mongoose.connection;
-
-db.on("connected", () => {
-	console.log("Connected to DB");
-});
-
-db.on("error", (err) => {
-	console.log("Connection Error:", err);
-});
-
-db.on("disconnected", () => {
-	console.log("Disconnected from DB");
-});
-
-module.exports = db;
+module.exports = supabase;

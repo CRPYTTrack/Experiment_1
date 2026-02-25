@@ -17,15 +17,6 @@ A web application to track real-time cryptocurrency prices, manage a personal po
 
 CryptoTrack is a web application that allows users to track real-time cryptocurrency prices, manage their portfolio, and maintain a watchlist. Users can register, log in, add/remove coins to their portfolio or watchlist, and export their portfolio data as PDF or CSV reports. This project was developed as part of an internship at Ultimez Technology Pvt Ltd.
 
-## Live Demo
-
-The application is deployed and publicly accessible:
-
-- **Frontend (Vercel):** [`https://cryptotrack-ultimez.vercel.app/`](https://cryptotrack-ultimez.vercel.app/)
-- **Backend (Render):** [`https://cryptotrack-rhun.onrender.com`](https://cryptotrack-rhun.onrender.com)
-
-_Note: The backend is hosted on a free Render instance, so the initial server response might be slow as the instance "wakes up" from a sleep state._
-
 ## Features
 
 - User authentication (register, login, logout)
@@ -33,25 +24,23 @@ _Note: The backend is hosted on a free Render instance, so the initial server re
 - Search cryptocurrency
 - Add/remove coins to portfolio and watchlist
 - Portfolio performance analytics (profit/loss, allocation chart, top gainers, top losers)
-- Export your portfolio report in both PDF and CSV formats.
+- Export your portfolio report in both PDF and CSV formats
 - View portfolio values in different fiat currencies (via Frankfurter API)
 - Dark mode support with theme persistence
 
 ## Tech Stack
 
-The project is built with the MERN stack and other modern technologies:
-
 - **Frontend:** React, Tailwind CSS
 - **Backend:** Node.js, Express.js
-- **Database:** MongoDB (with Mongoose)
+- **Database:** Supabase (PostgreSQL)
 - **Authentication:** JWT, Passport.js
 - **APIs:** CoinGecko (crypto data), Frankfurter (currency conversion)
 - **Key Libraries:**
-    - `axios`: For making API requests.
-    - `recharts`: For creating pie chart and bar chart.
-    - `framer-motion`: For UI animations.
-    - `jspdf` & `jspdf-autotable`: For generating PDF reports.
-    - `React-toastify`: For alerts.
+    - `axios`: For making API requests
+    - `recharts`: For creating pie chart and bar chart
+    - `framer-motion`: For UI animations
+    - `jspdf` & `jspdf-autotable`: For generating PDF reports
+    - `react-toastify`: For alerts
 
 ## Screenshots
 
@@ -97,7 +86,7 @@ Follow these instructions to set up and run the project locally on your machine.
 
 - Node.js (v18 or later recommended)
 - Git
-- MongoDB Community Server
+- A [Supabase](https://supabase.com) account and project
 
 ### 1. Clone the Repository
 
@@ -106,7 +95,46 @@ git clone https://github.com/JoyM268/CryptoTrack.git
 cd CryptoTrack
 ```
 
-### 2. Backend Setup
+### 2. Supabase Setup
+
+1. Go to [supabase.com](https://supabase.com) and create a new project
+2. Open the **SQL Editor** in your project and run the following to create the required tables:
+
+```sql
+CREATE TABLE users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  username TEXT UNIQUE NOT NULL,
+  password TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE watchlist (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  coin TEXT NOT NULL,
+  added_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(user_id, coin)
+);
+
+CREATE TABLE portfolio (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  coin TEXT NOT NULL,
+  total_investment NUMERIC(20, 8) NOT NULL DEFAULT 0,
+  coins NUMERIC(20, 8) NOT NULL DEFAULT 0,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(user_id, coin)
+);
+
+CREATE INDEX idx_users_username ON users(username);
+CREATE INDEX idx_watchlist_user_id ON watchlist(user_id);
+CREATE INDEX idx_portfolio_user_id ON portfolio(user_id);
+CREATE INDEX idx_portfolio_user_coin ON portfolio(user_id, coin);
+```
+
+3. Go to **Project Settings → API** and note down your **Project URL** and **service_role** secret key
+
+### 3. Backend Setup
 
 Navigate to the server directory and install dependencies.
 
@@ -115,30 +143,27 @@ cd Server
 npm install
 ```
 
-#### Setup Local MongoDB
-
-1.  Download and install [MongoDB Community Server](https://www.mongodb.com/try/download/community) if you haven't already.
-2.  Start the MongoDB service on your machine. On most systems, you can run `mongod` in a terminal.
-3.  The backend will connect to the default local URI.
-
 #### Environment Variables
 
-Create a `.env` file in the `Server` directory and add the following variables.
+Create a `.env` file in the `Server` directory and add the following:
 
 ```env
-MONGODB_URI="mongodb://127.0.0.1:27017/cryptotrack"
+SUPABASE_URL="https://your-project-id.supabase.co"
+SUPABASE_SERVICE_ROLE_KEY="your-service-role-secret-key"
 PORT=3000
 CLIENT="http://localhost:5173"
-JWT_SECRET="YOUR_JWT_SECRET"
+JWT_SECRET="your-jwt-secret"
 ```
 
 #### Run the Backend Server
 
 ```bash
-npm start
+npm run dev
 ```
 
-### 3. Frontend Setup
+The server will start at **http://localhost:3000**.
+
+### 4. Frontend Setup
 
 In a new terminal, navigate to the client directory and install dependencies.
 
@@ -168,7 +193,3 @@ The application should now be running at **http://localhost:5173**.
 
 - Cryptocurrency data provided by [CoinGecko API](https://www.coingecko.com/en/api).
 - Currency conversion powered by [Frankfurter API](https://www.frankfurter.app/).
-
-## Contact
-
-For any questions or suggestions, please reach out to [joy.mascarenhas@outlook.com](mailto:joy.mascarenhas@outlook.com).

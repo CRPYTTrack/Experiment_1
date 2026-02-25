@@ -1,9 +1,9 @@
 const express = require("express");
-const cors = require("cors");
-const db = require("./db");
 require("dotenv").config();
+const cors = require("cors");
+const supabase = require("./db");
 const jwt = require("jsonwebtoken");
-const User = require("./models/Users");
+const bcrypt = require("bcrypt");
 const PORT = process.env.PORT || 3000;
 const app = express();
 
@@ -25,18 +25,29 @@ app.get("/", (req, res) => {
 app.post("/register", async (req, res) => {
 	const { username, password } = req.body;
 	try {
-		const user = await User.findOne({ username });
-		if (user) {
+		// Check if user already exists
+		const { data: existing } = await supabase
+			.from("users")
+			.select("id")
+			.eq("username", username)
+			.maybeSingle();
+
+		if (existing) {
 			return res.status(400).json({ Error: "User Already Exists" });
 		}
 
-		const newUser = new User({ username, password });
-		const response = await newUser.save();
-		return res
-			.status(200)
-			.json({ message: "User Registered Successfully" });
+		const salt = await bcrypt.genSalt(10);
+		const hashedPassword = await bcrypt.hash(password, salt);
+
+		const { error } = await supabase
+			.from("users")
+			.insert({ username, password: hashedPassword });
+
+		if (error) throw error;
+
+		return res.status(200).json({ message: "User Registered Successfully" });
 	} catch (err) {
-		return res.status(500).json(err);
+		return res.status(500).json({ error: err.message });
 	}
 });
 
@@ -49,7 +60,7 @@ app.post("/login", (req, res, next) => {
 			return res.status(400).json({ error: "Invalid credentials" });
 		}
 
-		const payload = { id: user._id, username: user.username };
+		const payload = { id: user.id, username: user.username };
 		const token = jwt.sign(payload, process.env.JWT_SECRET, {
 			expiresIn: "24h",
 		});
@@ -58,7 +69,7 @@ app.post("/login", (req, res, next) => {
 			message: "Login successful",
 			token: token,
 			user: {
-				id: user._id,
+				id: user.id,
 				username: user.username,
 			},
 		});
@@ -70,15 +81,18 @@ app.get(
 	passport.authenticate("jwt", { session: false }),
 	async (req, res) => {
 		try {
-			const userId = req.user._id;
-			const user = await User.findById(userId);
-			if (!user) {
-				return res.status(404).json({ Error: "User not Found" });
-			}
+			const userId = req.user.id;
 
-			return res.json({ watchlist: user.watchlist });
+			const { data, error } = await supabase
+				.from("watchlist")
+				.select("coin")
+				.eq("user_id", userId);
+
+			if (error) throw error;
+
+			return res.json({ watchlist: data.map((row) => row.coin) });
 		} catch (err) {
-			return res.json(500).json(err);
+			return res.status(500).json({ error: err.message });
 		}
 	}
 );
@@ -88,15 +102,27 @@ app.get(
 	passport.authenticate("jwt", { session: false }),
 	async (req, res) => {
 		try {
-			const userId = req.user._id;
-			const user = await User.findById(userId);
-			if (!user) {
-				return res.status(404).json({ Error: "User not Found" });
+			const userId = req.user.id;
+
+			const { data, error } = await supabase
+				.from("portfolio")
+				.select("coin, total_investment, coins")
+				.eq("user_id", userId);
+
+			if (error) throw error;
+
+			// Convert to object map keyed by coin name
+			const portfolio = {};
+			for (const row of data) {
+				portfolio[row.coin] = {
+					totalInvestment: row.total_investment,
+					coins: row.coins,
+				};
 			}
 
-			return res.json(user.portfolio);
+			return res.json(portfolio);
 		} catch (err) {
-			return res.json(500).json(err);
+			return res.status(500).json({ error: err.message });
 		}
 	}
 );
@@ -105,22 +131,25 @@ app.put(
 	"/watchlist/add",
 	passport.authenticate("jwt", { session: false }),
 	async (req, res) => {
-		const userId = req.user._id;
+		const userId = req.user.id;
 		const coin = req.body.coin;
 		try {
-			const user = await User.findByIdAndUpdate(
-				userId,
-				{ $addToSet: { watchlist: coin } },
-				{ new: true }
-			);
+			const { error } = await supabase
+				.from("watchlist")
+				.upsert({ user_id: userId, coin }, { onConflict: "user_id,coin" });
 
-			if (!user) {
-				return res.status(404).json({ Error: "User not Found" });
-			}
+			if (error) throw error;
 
-			return res.status(200).json({ watchlist: user.watchlist });
+			const { data, error: fetchError } = await supabase
+				.from("watchlist")
+				.select("coin")
+				.eq("user_id", userId);
+
+			if (fetchError) throw fetchError;
+
+			return res.status(200).json({ watchlist: data.map((row) => row.coin) });
 		} catch (err) {
-			return res.status(500).json(err.message);
+			return res.status(500).json({ error: err.message });
 		}
 	}
 );
@@ -129,22 +158,27 @@ app.put(
 	"/watchlist/remove",
 	passport.authenticate("jwt", { session: false }),
 	async (req, res) => {
-		const userId = req.user._id;
+		const userId = req.user.id;
 		const coin = req.body.coin;
 		try {
-			const user = await User.findByIdAndUpdate(
-				userId,
-				{ $pull: { watchlist: coin } },
-				{ new: true }
-			);
+			const { error } = await supabase
+				.from("watchlist")
+				.delete()
+				.eq("user_id", userId)
+				.eq("coin", coin);
 
-			if (!user) {
-				return res.status(404).json({ Error: "User not Found" });
-			}
+			if (error) throw error;
 
-			return res.status(200).json({ watchlist: user.watchlist });
+			const { data, error: fetchError } = await supabase
+				.from("watchlist")
+				.select("coin")
+				.eq("user_id", userId);
+
+			if (fetchError) throw fetchError;
+
+			return res.status(200).json({ watchlist: data.map((row) => row.coin) });
 		} catch (err) {
-			return res.status(500).json(err.message);
+			return res.status(500).json({ error: err.message });
 		}
 	}
 );
@@ -153,7 +187,7 @@ app.put(
 	"/portfolio/update",
 	passport.authenticate("jwt", { session: false }),
 	async (req, res) => {
-		const userId = req.user._id;
+		const userId = req.user.id;
 		const { coin, coinData } = req.body;
 
 		try {
@@ -166,66 +200,93 @@ app.put(
 				return res.status(400).json({ error: "Invalid input data" });
 			}
 
-			const user = await User.findById(userId);
-			if (!user) {
-				return res.status(404).json({ error: "User not found" });
-			}
+			// Get existing coin entry
+			const { data: existing } = await supabase
+				.from("portfolio")
+				.select("*")
+				.eq("user_id", userId)
+				.eq("coin", coin)
+				.maybeSingle();
 
-			const portfolio = user.portfolio;
-			const existingCoinData = portfolio.get(coin);
-
-			if (existingCoinData) {
-				const newCoins = existingCoinData.coins + coinData.coins;
+			if (existing) {
+				const newCoins = existing.coins + coinData.coins;
 
 				if (coinData.coins < 0) {
 					const sellAmount = Math.abs(coinData.coins);
-					const ownedCoins = existingCoinData.coins;
-
-					if (sellAmount > ownedCoins) {
+					if (sellAmount > existing.coins) {
 						return res.status(400).json({
-							error: `Cannot sell ${sellAmount} coins. You only own ${ownedCoins} coins.`,
+							error: `Cannot sell ${sellAmount} coins. You only own ${existing.coins} coins.`,
 						});
 					}
 				}
 
 				if (newCoins <= 0) {
-					portfolio.delete(coin);
+					// Remove coin from portfolio
+					const { error } = await supabase
+						.from("portfolio")
+						.delete()
+						.eq("user_id", userId)
+						.eq("coin", coin);
+
+					if (error) throw error;
 				} else {
 					let newTotalInvestment;
-
 					if (coinData.coins < 0) {
-						const remainingRatio =
-							newCoins / existingCoinData.coins;
-						newTotalInvestment =
-							existingCoinData.totalInvestment * remainingRatio;
+						const remainingRatio = newCoins / existing.coins;
+						newTotalInvestment = existing.total_investment * remainingRatio;
 					} else {
-						newTotalInvestment =
-							existingCoinData.totalInvestment +
-							coinData.totalInvestment;
+						newTotalInvestment = existing.total_investment + coinData.totalInvestment;
 					}
 
-					existingCoinData.totalInvestment = newTotalInvestment;
-					existingCoinData.coins = newCoins;
-					portfolio.set(coin, existingCoinData);
+					const { error } = await supabase
+						.from("portfolio")
+						.update({ coins: newCoins, total_investment: newTotalInvestment })
+						.eq("user_id", userId)
+						.eq("coin", coin);
+
+					if (error) throw error;
 				}
 			} else {
-				if (coinData.totalInvestment > 0 && coinData.coins > 0) {
-					portfolio.set(coin, coinData);
-				} else if (coinData.coins < 0) {
+				if (coinData.coins < 0) {
 					return res.status(400).json({
 						error: "Cannot sell coins that are not in your portfolio",
 					});
 				}
+				if (coinData.totalInvestment > 0 && coinData.coins > 0) {
+					const { error } = await supabase.from("portfolio").insert({
+						user_id: userId,
+						coin,
+						total_investment: coinData.totalInvestment,
+						coins: coinData.coins,
+					});
+
+					if (error) throw error;
+				}
 			}
 
-			user.markModified("portfolio");
+			// Return updated portfolio
+			const { data, error: fetchError } = await supabase
+				.from("portfolio")
+				.select("coin, total_investment, coins")
+				.eq("user_id", userId);
 
-			const updatedUser = await user.save();
-			return res.status(200).json(updatedUser.portfolio);
+			if (fetchError) throw fetchError;
+
+			const portfolio = {};
+			for (const row of data) {
+				portfolio[row.coin] = {
+					totalInvestment: row.total_investment,
+					coins: row.coins,
+				};
+			}
+
+			return res.status(200).json(portfolio);
 		} catch (err) {
-			return res.status(500).json(err.message);
+			return res.status(500).json({ error: err.message });
 		}
 	}
 );
 
-app.listen(PORT);
+app.listen(PORT, () => {
+	console.log(`Server running on port ${PORT}`);
+});
