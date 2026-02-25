@@ -2,8 +2,6 @@ import React, {
 	createContext,
 	useContext,
 	useState,
-	useEffect,
-	Children,
 } from "react";
 
 const CurrencyContext = createContext();

@@ -12,7 +12,7 @@ const Form = ({
 	const { formatCurrency, currency } = useCurrency();
 	const [amount, setAmount] = useState(0);
 	const [price, setPrice] = useState(
-		(coinData.current_price * currency[1]).toFixed(2)
+		((coinData.current_price ?? 0) * currency[1]).toFixed(2)
 	);
 	const isSelling = buttonText === "Remove";
 	const [warning, setWarning] = useState(null);

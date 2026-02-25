@@ -66,7 +66,7 @@ const PortfolioCoinRow = ({
 			</td>
 
 			<td className={`px-6 py-4 font-medium ${color}`}>
-				{profit.toFixed(2).toLocaleString()}%
+				{profit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
 			</td>
 			<td className="px-6 py-4">
 				<div className="flex items-center gap-2">

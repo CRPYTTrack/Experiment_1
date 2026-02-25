@@ -13,10 +13,10 @@ export default function useCurrencyData() {
 				setError(null);
 				const res = await fetch(FRANKFURTER_API);
 
-				const data = await res.json();
 				if (!res.ok) {
 					throw new Error("An Error Occured");
 				}
+				const data = await res.json();
 				setCurrencyData(data);
 			} catch (err) {
 				setError(err);
