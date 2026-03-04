@@ -26,11 +26,16 @@ app.post("/register", async (req, res) => {
 	const { username, password } = req.body;
 	try {
 		// Check if user already exists
-		const { data: existing } = await supabase
+		const { data: existing, error: checkError } = await supabase
 			.from("users")
 			.select("id")
 			.eq("username", username)
 			.maybeSingle();
+
+		if (checkError) {
+			console.error("Check user error:", checkError);
+			throw checkError;
+		}
 
 		if (existing) {
 			return res.status(400).json({ Error: "User Already Exists" });
@@ -39,14 +44,18 @@ app.post("/register", async (req, res) => {
 		const salt = await bcrypt.genSalt(10);
 		const hashedPassword = await bcrypt.hash(password, salt);
 
-		const { error } = await supabase
+		const { error: insertError } = await supabase
 			.from("users")
 			.insert({ username, password: hashedPassword });
 
-		if (error) throw error;
+		if (insertError) {
+			console.error("Insert user error:", insertError);
+			throw insertError;
+		}
 
 		return res.status(200).json({ message: "User Registered Successfully" });
 	} catch (err) {
+		console.error("Register error:", err);
 		return res.status(500).json({ error: err.message });
 	}
 });
