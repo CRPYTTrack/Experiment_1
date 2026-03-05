@@ -296,6 +296,92 @@ app.put(
 	}
 );
 
+// ─── Price Alerts Routes ───────────────────────────────────────────────────────
+
+// GET /alerts - fetch all alerts for the authenticated user
+app.get(
+	"/alerts",
+	passport.authenticate("jwt", { session: false }),
+	async (req, res) => {
+		try {
+			const userId = req.user.id;
+			const { data, error } = await supabase
+				.from("alerts")
+				.select("id, coin_id, coin_name, coin_image, target_price, condition, created_at")
+				.eq("user_id", userId)
+				.order("created_at", { ascending: false });
+
+			if (error) throw error;
+			return res.json({ alerts: data });
+		} catch (err) {
+			return res.status(500).json({ error: err.message });
+		}
+	}
+);
+
+// POST /alerts - create a new price alert
+app.post(
+	"/alerts",
+	passport.authenticate("jwt", { session: false }),
+	async (req, res) => {
+		try {
+			const userId = req.user.id;
+			const { coin_id, coin_name, coin_image, target_price, condition } = req.body;
+
+			if (!coin_id || !coin_name || !target_price || !condition) {
+				return res.status(400).json({ error: "Missing required fields" });
+			}
+			if (!["above", "below"].includes(condition)) {
+				return res.status(400).json({ error: "Condition must be 'above' or 'below'" });
+			}
+			if (isNaN(parseFloat(target_price)) || parseFloat(target_price) <= 0) {
+				return res.status(400).json({ error: "Target price must be a positive number" });
+			}
+
+			const { data, error } = await supabase
+				.from("alerts")
+				.insert({
+					user_id: userId,
+					coin_id,
+					coin_name,
+					coin_image: coin_image || null,
+					target_price: parseFloat(target_price),
+					condition,
+				})
+				.select()
+				.single();
+
+			if (error) throw error;
+			return res.status(201).json({ alert: data });
+		} catch (err) {
+			return res.status(500).json({ error: err.message });
+		}
+	}
+);
+
+// DELETE /alerts/:id - delete a specific alert
+app.delete(
+	"/alerts/:id",
+	passport.authenticate("jwt", { session: false }),
+	async (req, res) => {
+		try {
+			const userId = req.user.id;
+			const alertId = req.params.id;
+
+			const { error } = await supabase
+				.from("alerts")
+				.delete()
+				.eq("id", alertId)
+				.eq("user_id", userId);
+
+			if (error) throw error;
+			return res.json({ message: "Alert deleted successfully" });
+		} catch (err) {
+			return res.status(500).json({ error: err.message });
+		}
+	}
+);
+
 app.listen(PORT, () => {
 	console.log(`Server running on port ${PORT}`);
 });
