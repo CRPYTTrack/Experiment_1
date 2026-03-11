@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
 	Routes,
 	Route,
@@ -13,9 +13,10 @@ import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import SignUp from "./pages/SignUp";
 import Watchlist from "./pages/Watchlist";
+import PriceAlerts from "./pages/PriceAlerts";
 import { AnimatePresence } from "motion/react";
 import { useAuth } from "./context/AuthContext";
-import { portfolioAPI, watchlistAPI } from "./services/api";
+import { portfolioAPI, watchlistAPI, alertsAPI } from "./services/api";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -26,11 +27,14 @@ const App = () => {
 	const [form, setForm] = useState(false);
 	const [coinData, setCoinData] = useState({});
 	const [portfolio, setPortfolio] = useState({});
+	const [alerts, setAlerts] = useState([]);
+	const alertsRef = useRef(alerts);
 	const navigate = useNavigate();
 
 	const handleLogout = () => {
 		setWatchlist([]);
 		setPortfolio({});
+		setAlerts([]);
 		logout();
 		toast.success("Logged out successfully", {
 			position: "top-right",
@@ -49,21 +53,79 @@ const App = () => {
 		} else {
 			setWatchlist([]);
 			setPortfolio({});
+			setAlerts([]);
 		}
 	}, [isAuthenticated]);
 
 	const loadUserData = async () => {
 		try {
-			const [portfolioData, watchlistData] = await Promise.all([
-				portfolioAPI.get(),
-				watchlistAPI.get(),
+			const [portfolioData, watchlistData, alertsData] = await Promise.all([
+			portfolioAPI.get(),
+			watchlistAPI.get(),
+			 alertsAPI.get(),
 			]);
 			setPortfolio(portfolioData);
-			setWatchlist(watchlistData.watchlist);
+		setWatchlist(watchlistData.watchlist);
+		setAlerts(alertsData.alerts || []);
 		} catch (error) {
 			console.error("Failed to load user data:", error);
 		}
 	};
+
+	// Keep alertsRef in sync with the latest alerts state
+	useEffect(() => {
+		alertsRef.current = alerts;
+	}, [alerts]);
+
+	// Price alert checker — runs every 60 seconds when user is logged in
+	useEffect(() => {
+		if (!isAuthenticated) return;
+
+		const checkAlerts = async () => {
+			const currentAlerts = alertsRef.current;
+			if (currentAlerts.length === 0) return;
+			try {
+				const coinIds = [...new Set(currentAlerts.map((a) => a.coin_id))].join(",");
+				const res = await fetch(
+					`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${coinIds}&order=market_cap_desc&sparkline=false`
+				);
+				if (!res.ok) return;
+				const coins = await res.json();
+
+				const triggeredIds = [];
+				currentAlerts.forEach((alert) => {
+					const coin = coins.find((c) => c.id === alert.coin_id);
+					if (!coin) return;
+					const currentPrice = coin.current_price;
+					const triggered =
+						(alert.condition === "above" && currentPrice >= alert.target_price) ||
+						(alert.condition === "below" && currentPrice <= alert.target_price);
+
+					if (triggered) {
+						toast.success(
+							`🔔 ${alert.coin_name} is now ${currentPrice.toLocaleString()} — ${alert.condition === "above" ? "above" : "below"} your target of ${Number(alert.target_price).toLocaleString()}!`,
+							{ autoClose: 6000 }
+						);
+						triggeredIds.push(alert.id);
+					}
+				});
+
+				// Remove triggered alerts
+				if (triggeredIds.length > 0) {
+					await Promise.all(triggeredIds.map((id) => alertsAPI.remove(id)));
+					const updated = currentAlerts.filter((a) => !triggeredIds.includes(a.id));
+					alertsRef.current = updated;
+					setAlerts(updated);
+				}
+			} catch (err) {
+				console.error("Alert check failed:", err);
+			}
+		};
+
+		checkAlerts();
+		const interval = setInterval(checkAlerts, 60000);
+		return () => clearInterval(interval);
+	}, [isAuthenticated]);
 
 	function toggleForm(coin = null) {
 		if (coin) {
@@ -230,6 +292,16 @@ const App = () => {
 								form={form}
 								coinData={coinData}
 							/>
+						) : (
+							<Navigate to="/login" />
+						)
+					}
+				/>
+				<Route
+					path="/alerts"
+					element={
+						isAuthenticated ? (
+							<PriceAlerts alerts={alerts} setAlerts={setAlerts} />
 						) : (
 							<Navigate to="/login" />
 						)

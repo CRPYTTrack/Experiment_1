@@ -58,4 +58,21 @@ export const watchlistAPI = {
 	},
 };
 
+export const alertsAPI = {
+	get: async () => {
+		const response = await api.get("/alerts");
+		return response.data;
+	},
+
+	add: async (alertData) => {
+		const response = await api.post("/alerts", alertData);
+		return response.data;
+	},
+
+	remove: async (id) => {
+		const response = await api.delete(`/alerts/${id}`);
+		return response.data;
+	},
+};
+
 export default api;

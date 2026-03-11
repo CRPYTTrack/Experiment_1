@@ -35,4 +35,5 @@ The fix was implemented directly in the Supabase project configuration.
 
 ## Date
 
+3rd March
 March 2026
