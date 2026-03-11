@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
 	Routes,
 	Route,
@@ -28,6 +28,7 @@ const App = () => {
 	const [coinData, setCoinData] = useState({});
 	const [portfolio, setPortfolio] = useState({});
 	const [alerts, setAlerts] = useState([]);
+	const alertsRef = useRef(alerts);
 	const navigate = useNavigate();
 
 	const handleLogout = () => {
@@ -71,13 +72,20 @@ const App = () => {
 		}
 	};
 
+	// Keep alertsRef in sync with the latest alerts state
+	useEffect(() => {
+		alertsRef.current = alerts;
+	}, [alerts]);
+
 	// Price alert checker — runs every 60 seconds when user is logged in
 	useEffect(() => {
-		if (!isAuthenticated || alerts.length === 0) return;
+		if (!isAuthenticated) return;
 
 		const checkAlerts = async () => {
+			const currentAlerts = alertsRef.current;
+			if (currentAlerts.length === 0) return;
 			try {
-				const coinIds = [...new Set(alerts.map((a) => a.coin_id))].join(",");
+				const coinIds = [...new Set(currentAlerts.map((a) => a.coin_id))].join(",");
 				const res = await fetch(
 					`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${coinIds}&order=market_cap_desc&sparkline=false`
 				);
@@ -85,7 +93,7 @@ const App = () => {
 				const coins = await res.json();
 
 				const triggeredIds = [];
-				alerts.forEach((alert) => {
+				currentAlerts.forEach((alert) => {
 					const coin = coins.find((c) => c.id === alert.coin_id);
 					if (!coin) return;
 					const currentPrice = coin.current_price;
@@ -105,7 +113,9 @@ const App = () => {
 				// Remove triggered alerts
 				if (triggeredIds.length > 0) {
 					await Promise.all(triggeredIds.map((id) => alertsAPI.remove(id)));
-					setAlerts((prev) => prev.filter((a) => !triggeredIds.includes(a.id)));
+					const updated = currentAlerts.filter((a) => !triggeredIds.includes(a.id));
+					alertsRef.current = updated;
+					setAlerts(updated);
 				}
 			} catch (err) {
 				console.error("Alert check failed:", err);
@@ -115,7 +125,7 @@ const App = () => {
 		checkAlerts();
 		const interval = setInterval(checkAlerts, 60000);
 		return () => clearInterval(interval);
-	}, [isAuthenticated, alerts]);
+	}, [isAuthenticated]);
 
 	function toggleForm(coin = null) {
 		if (coin) {

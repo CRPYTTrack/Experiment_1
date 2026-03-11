@@ -51,7 +51,7 @@ const Menu = ({ handleLogout }) => {
 					>
 					Watchlist
 					</NavLink>
-					<NavLink
+				<NavLink
 				to="alerts"
 				className={({ isActive }) =>
 					`p-2 w-full font-medium ${
@@ -64,8 +64,8 @@ const Menu = ({ handleLogout }) => {
 				Alerts
 			</NavLink>
 			<button
-						onClick={handleLogout}
-						className="p-2 w-full text-white bg-blue-600 hover:bg-blue-700 font-medium"
+							onClick={handleLogout}
+							className="p-2 w-full text-white bg-blue-600 hover:bg-blue-700 font-medium"
 					>
 						Logout
 					</button>
