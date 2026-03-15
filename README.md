@@ -78,6 +78,13 @@ Downloadable portfolio report in PDF format.
 <img src="./images/csv.png" alt="Exported CSV" width="800px">
 Downloadable portfolio report in CSV format.
 
+## Documentation
+
+For a deeper dive into the technical details, API endpoints, and full setup, please refer to the following guides within the `docs/` directory:
+- [System Architecture](./docs/architecture.md)
+- [API Reference](./docs/api-reference.md)
+- [Local Setup Guide](./docs/setup-guide.md)
+
 ## Getting Started
 
 Follow these instructions to set up and run the project locally on your machine.
