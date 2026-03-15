@@ -10,14 +10,14 @@ This guide walks you through setting up the CryptoTrack application on your loca
 ## 1. Supabase Initialization
 1.  Log in to [Supabase](https://supabase.com/) and create a new project.
 2.  Navigate to the **SQL Editor** in the Supabase dashboard.
-3.  Run the necessary table creation SQL script (found in the main `README.md`) to set up `users`, `watchlist`, `portfolio`, and `alerts` tables (or apply migrations if available).
+3.  Run the necessary table creation SQL script (found in the main `README.md`) to set up `users`, `watchlist`, `portfolio`, and `alerts` tables.
 4.  Navigate to **Project Settings -> API** and copy your **Project URL** and **`service_role` secret key**.
 
 ## 2. Clone the Repository
 Open your terminal and clone the GitHub repository:
 ```bash
-git clone https://github.com/JoyM268/CryptoTrack.git
-cd CryptoTrack
+git clone <REPO_CLONE_URL>
+cd <REPO_DIRECTORY>
 ```
 
 ## 3. Backend (Server) Setup
