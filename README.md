@@ -143,7 +143,7 @@ CREATE TABLE alerts (
   coin_id TEXT NOT NULL,
   coin_name TEXT NOT NULL,
   coin_image TEXT,
-  target_price NUMERIC(20, 8) NOT NULL,
+  target_price NUMERIC(20, 8) NOT NULL CHECK (target_price > 0),
   condition TEXT NOT NULL CHECK (condition IN ('above', 'below')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
