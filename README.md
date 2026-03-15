@@ -9,6 +9,10 @@ A web application to track real-time cryptocurrency prices, manage a personal po
 - [Features](#features)
 - [Tech Stack](#tech-stack)
 - [Screenshots](#screenshots)
+- [Documentation](#documentation)
+  - [System Architecture](./docs/architecture.md)
+  - [API Reference](./docs/api-reference.md)
+  - [Local Setup Guide](./docs/setup-guide.md)
 - [Getting Started](#getting-started)
 - [Attributions](#attributions)
 - [Contact](#contact)
@@ -78,6 +82,13 @@ Downloadable portfolio report in PDF format.
 <img src="./images/csv.png" alt="Exported CSV" width="800px">
 Downloadable portfolio report in CSV format.
 
+## Documentation
+
+For a deeper dive into the technical details, API endpoints, and full setup, please refer to the following guides within the `docs/` directory:
+- [System Architecture](./docs/architecture.md)
+- [API Reference](./docs/api-reference.md)
+- [Local Setup Guide](./docs/setup-guide.md)
+
 ## Getting Started
 
 Follow these instructions to set up and run the project locally on your machine.
@@ -91,8 +102,8 @@ Follow these instructions to set up and run the project locally on your machine.
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/JoyM268/CryptoTrack.git
-cd CryptoTrack
+git clone <REPO_CLONE_URL>
+cd <REPO_DIRECTORY>
 ```
 
 ### 2. Supabase Setup
@@ -126,10 +137,22 @@ CREATE TABLE portfolio (
   UNIQUE(user_id, coin)
 );
 
+CREATE TABLE alerts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  coin_id TEXT NOT NULL,
+  coin_name TEXT NOT NULL,
+  coin_image TEXT,
+  target_price NUMERIC(20, 8) NOT NULL CHECK (target_price > 0),
+  condition TEXT NOT NULL CHECK (condition IN ('above', 'below')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE INDEX idx_users_username ON users(username);
 CREATE INDEX idx_watchlist_user_id ON watchlist(user_id);
 CREATE INDEX idx_portfolio_user_id ON portfolio(user_id);
 CREATE INDEX idx_portfolio_user_coin ON portfolio(user_id, coin);
+CREATE INDEX idx_alerts_user_id ON alerts(user_id);
 ```
 
 3. Go to **Project Settings → API** and note down your **Project URL** and **service_role** secret key
